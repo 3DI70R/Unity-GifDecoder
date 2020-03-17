@@ -1,1 +1,1 @@
-# UnityGifDecoder
+﻿# UnityGifDecoder
