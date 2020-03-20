@@ -1,31 +1,17 @@
 ﻿using System;
+using ThreeDISevenZeroR.UnityGifDecoder.Model;
 using UnityEngine;
 
 namespace ThreeDISevenZeroR.UnityGifDecoder
 {
+    /// <summary>
+    /// GIF Canvas buffer for drawing decoded frames
+    /// </summary>
     public class GifCanvas
     {
-        public enum DisposalMethod
-        {
-            /// <summary>
-            /// Keep previous frame and draw new frame on top of it
-            /// </summary>
-            Keep,
-            
-            /// <summary>
-            /// Clear canvas and draw
-            /// </summary>
-            ClearToBackgroundColor,
-            
-            /// <summary>
-            /// Revert previous drawing operation, so canvas will contain previous frame
-            /// </summary>
-            Revert
-        }
-
         /// <summary>
         /// Get color array from this Canvas
-        /// You should not modify this 
+        /// For performance reasons, actual canvas array is returned, so 
         /// </summary>
         public Color32[] Colors => canvasColors;
         
@@ -53,12 +39,16 @@ namespace ThreeDISevenZeroR.UnityGifDecoder
         private bool canvasIsEmpty;
 
         private Color32[] framePalette;
-        private DisposalMethod frameDisposalMethod;
+        private GifDisposalMethod frameDisposalMethod;
 
         private int frameCanvasPosition;
         private int frameCanvasRowEndPosition;
         private int frameTransparentColorIndex;
         private int frameRowCurrent;
+        private int frameX;
+        private int frameY;
+        private int frameWidth;
+        private int frameHeight;
         private int[] frameRowStart;
         private int[] frameRowEnd;
 
@@ -66,24 +56,27 @@ namespace ThreeDISevenZeroR.UnityGifDecoder
         {
             canvasIsEmpty = true;
         }
-
+        
         public GifCanvas(int width, int height) : this()
         {
             SetSize(width, height);
         }
 
+        /// <summary>
+        /// Resizes canvas and resets its initial state
+        /// </summary>
+        /// <param name="width">New canvas width</param>
+        /// <param name="height">New canvas height</param>
         public void SetSize(int width, int height)
         {
             if (width != canvasWidth || height != canvasHeight)
             {
                 var size = width * height;
-                Array.Resize(ref canvasColors, size);
-                Array.Resize(ref frameRowStart, height);
-                Array.Resize(ref frameRowEnd, height);
+                canvasColors = new Color32[size];
+                frameRowStart = new int[height];
+                frameRowEnd = new int[height];
+                revertDisposalBuffer = null;
 
-                if (revertDisposalBuffer != null)
-                    Array.Resize(ref revertDisposalBuffer, size);
-                
                 canvasWidth = width;
                 canvasHeight = height;
             }
@@ -91,35 +84,55 @@ namespace ThreeDISevenZeroR.UnityGifDecoder
             Reset();
         }
 
+        /// <summary>
+        /// Clears canvas colors and resets it to initial state
+        /// </summary>
         public void Reset()
         {
-            frameDisposalMethod = DisposalMethod.Keep;
+            frameDisposalMethod = GifDisposalMethod.Keep;
+            frameX = 0;
+            frameY = 0;
+            frameWidth = canvasWidth;
+            frameHeight = canvasHeight;
 
             if (!canvasIsEmpty)
             {
-                FillWithColor(new Color32(0, 0, 0, 0));
+                FillWithColor(0, 0, canvasWidth, canvasHeight, new Color32(BackgroundColor.r, BackgroundColor.g, BackgroundColor.b, 0));
                 canvasIsEmpty = true;
             }
         }
 
+        /// <summary>
+        /// Method initiates new drawing, sequential calls to OutputPixel will draw everything on canvas
+        /// </summary>
+        /// <param name="x">Left offset of frame</param>
+        /// <param name="y">Top offset of frame</param>
+        /// <param name="width">Frame width</param>
+        /// <param name="height">Frame height</param>
+        /// <param name="palette">Color palette for this frame</param>
+        /// <param name="transparentColorIndex">Index of transparent color, color from this index will be treated as transparent</param>
+        /// <param name="isInterlaced">Apply deinterlacing during drawing</param>
+        /// <param name="disposalMethod">Specifies, how to handle this frame when next frame is drawn</param>
         public void BeginNewFrame(int x, int y, int width, int height, Color32[] palette, 
-            int transparentColorIndex, bool isInterlaced, DisposalMethod disposalMethod)
+            int transparentColorIndex, bool isInterlaced, GifDisposalMethod disposalMethod)
         {
             switch (frameDisposalMethod)
             {
-                case DisposalMethod.ClearToBackgroundColor:
-                    FillWithColor(new Color32(BackgroundColor.r, BackgroundColor.g, BackgroundColor.b, 0));
+                case GifDisposalMethod.ClearToBackgroundColor:
+                    FillWithColor(frameX, frameY, frameWidth, frameHeight, 
+                        new Color32(BackgroundColor.r, BackgroundColor.g, BackgroundColor.b, 0));
+
                     break;
 
-                case DisposalMethod.Revert:
-                    if(disposalMethod != DisposalMethod.Keep)
+                case GifDisposalMethod.Revert:
+                    if(disposalMethod != GifDisposalMethod.Keep)
                         Array.Copy(revertDisposalBuffer, 0, canvasColors, 0, revertDisposalBuffer.Length);
                     break;
             }
 
             switch (disposalMethod)
             {
-                case DisposalMethod.Revert:
+                case GifDisposalMethod.Revert:
                     if (revertDisposalBuffer == null)
                         revertDisposalBuffer = new Color32[canvasColors.Length];
 
@@ -131,6 +144,10 @@ namespace ThreeDISevenZeroR.UnityGifDecoder
             framePalette = palette;
             frameDisposalMethod = disposalMethod;
             canvasIsEmpty = false;
+            frameWidth = width;
+            frameHeight = height;
+            frameX = x;
+            frameY = y;
 
             // Start before canvas, so next pixel output will load correct region
             frameCanvasPosition = 0;
@@ -141,6 +158,13 @@ namespace ThreeDISevenZeroR.UnityGifDecoder
             RouteFrameDrawing(x, y, width, height, isInterlaced);
         }
 
+        /// <summary>
+        /// <p>Place pixel on canvas</p>
+        /// <br/>
+        /// <p>Pixel will be placed inside region specified by "BeginNewFrame",
+        /// sequential calls to "OutputPixel" will fill region eventually</p>
+        /// </summary>
+        /// <param name="color">Index of color from palette to place on canvas</param>
         public void OutputPixel(int color)
         {
             if (frameCanvasPosition >= frameCanvasRowEndPosition)
@@ -155,7 +179,47 @@ namespace ThreeDISevenZeroR.UnityGifDecoder
             else
                 frameCanvasPosition++;
         }
+        
+        /// <summary>
+        /// Fill specified region with single color
+        /// </summary>
+        public void FillWithColor(int x, int y, int width, int height, Color32 color)
+        {
+            if (x == 0 && y == 0 && width == canvasWidth && height == canvasHeight)
+            {
+                for (var i = canvasColors.Length - 1; i >= 0; i--)
+                    canvasColors[i] = color;
+            }
+            else
+            {
+                int yStart;
+                int yEnd;
+                    
+                if (FlipVertically)
+                {
+                    yEnd = (canvasHeight - y) * canvasWidth + x;
+                    yStart = yEnd - canvasWidth * height;
+                }
+                else
+                {
+                    yStart = y * canvasWidth + x;
+                    yEnd = yStart + height * canvasWidth;
+                }
 
+                for (var ySrc = yStart; ySrc < yEnd; ySrc += canvasWidth)
+                {
+                    var rowEnd = ySrc + width;
+                    for (var i = ySrc; i < rowEnd; i++)
+                        canvasColors[i] = color;
+                }
+            }
+        }
+
+        /// <summary>
+        /// <p>Plan most optimal image drawing route</p>
+        /// <p>So colors can be written to final locations right from the start,
+        /// without intermediate buffers or sorting/p>
+        /// </summary>
         private void RouteFrameDrawing(int x, int y, int width, int height, bool deinterlace)
         {
             var currentRow = 0;
@@ -182,12 +246,6 @@ namespace ThreeDISevenZeroR.UnityGifDecoder
             {
                 for (var i = 0; i < height; i++) ScheduleRowIndex(i); // every row in order
             }
-        }
-
-        public void FillWithColor(Color32 color)
-        {
-            for (var i = 0; i < canvasColors.Length; i++)
-                canvasColors[i] = color;
         }
     }
 }

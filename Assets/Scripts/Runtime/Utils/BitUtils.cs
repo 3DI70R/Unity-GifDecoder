@@ -6,11 +6,31 @@ namespace ThreeDISevenZeroR.UnityGifDecoder.Utils
 {
     public static class BitUtils
     {
+        public static bool CheckString(byte[] array, string s)
+        {
+            for (var i = 0; i < array.Length; i++)
+            {
+                if (array[i] != s[i])
+                    return false;
+            }
+
+            return true;
+        }
+
         public static int ReadInt16LittleEndian(this Stream reader)
         {
             var b1 = reader.ReadByte8();
             var b2 = reader.ReadByte8();
             return (b2 << 8) + b1;
+        }
+
+        public static int ReadInt32LittleEndian(this Stream reader)
+        {
+            var b1 = reader.ReadByte8();
+            var b2 = reader.ReadByte8();
+            var b3 = reader.ReadByte8();
+            var b4 = reader.ReadByte8();
+            return (b4 << 24) + (b3 << 16) + (b2 << 8) + b1;
         }
 
         public static byte ReadByte8(this Stream reader)

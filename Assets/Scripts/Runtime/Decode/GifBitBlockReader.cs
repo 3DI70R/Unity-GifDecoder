@@ -3,31 +3,40 @@ using ThreeDISevenZeroR.UnityGifDecoder.Utils;
 
 namespace ThreeDISevenZeroR.UnityGifDecoder
 {
+    /// <summary>
+    /// Reader for GIF Blocks
+    /// </summary>
     public class GifBitBlockReader
     {
         private Stream stream;
-        private byte[] buffer;
         private int currentByte;
         private int currentBitPosition;
         private int currentBufferPosition;
         private int currentBufferSize;
         private bool endReached;
+        private readonly byte[] buffer;
 
         public GifBitBlockReader()
         {
             buffer = new byte[256];
         }
-
+        
         public GifBitBlockReader(Stream stream) : this()
         {
             SetStream(stream);
         }
 
+        /// <summary>
+        /// Set new stream
+        /// </summary>
         public void SetStream(Stream stream)
         {
             this.stream = stream;
         }
 
+        /// <summary>
+        /// Read first block and initialize reading
+        /// </summary>
         public void StartNewReading()
         {
             currentByte = 0;
@@ -35,16 +44,22 @@ namespace ThreeDISevenZeroR.UnityGifDecoder
             ReadNextBlock();
         }
 
-        private void ReadNextBlock()
+        /// <summary>
+        /// Skips to the last block, if end is not reached
+        /// </summary>
+        public void FinishReading()
         {
-            currentBufferSize = stream.ReadByte8();
-            currentBufferPosition = 0;
-            endReached = currentBufferSize == 0;
-            
-            if(!endReached)
-                stream.Read(buffer, 0, currentBufferSize);
+            while (!endReached)
+            {
+                ReadNextBlock();
+            }
         }
 
+        /// <summary>
+        /// Read bits from stream and construct value
+        /// </summary>
+        /// <param name="count">Bit count to read</param>
+        /// <returns>Value from readed bits</returns>
         public int ReadBits(int count)
         {
             var result = 0;
@@ -74,6 +89,16 @@ namespace ThreeDISevenZeroR.UnityGifDecoder
             }
 
             return result;
+        }
+        
+        private void ReadNextBlock()
+        {
+            currentBufferSize = stream.ReadByte8();
+            currentBufferPosition = 0;
+            endReached = currentBufferSize == 0;
+            
+            if(!endReached)
+                stream.Read(buffer, 0, currentBufferSize);
         }
     }
 }

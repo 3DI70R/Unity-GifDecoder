@@ -2,8 +2,14 @@
  
 namespace ThreeDISevenZeroR.UnityGifDecoder.Decode
 {
+    /// <summary>
+    /// LZW Dictionary used to decode bit stream
+    /// </summary>
     public class GifLzwDictionary
     {
+        /// <summary>
+        /// Current entry code size in bits
+        /// </summary>
         public int CodeSize { get; private set; }
         
         private readonly Entry[] dictionaryEntries;
@@ -21,12 +27,19 @@ namespace ThreeDISevenZeroR.UnityGifDecoder.Decode
         private int stopCodeId;
         private bool isFull;
         
+        /// <summary>
+        /// Creates new instance and allocates dictionary resources
+        /// </summary>
         public GifLzwDictionary()
         {
             dictionaryEntries = new Entry[4096];
             dictionaryHeap = new byte[16384];
         }
 
+        /// <summary>
+        /// Initializes dictionary with minimum code size
+        /// </summary>
+        /// <param name="minLzwCodeSize">new minimum lzw code size</param>
         public void InitWithWordSize(int minLzwCodeSize)
         {
             if (currentMinLzwCodeSize != minLzwCodeSize)
@@ -54,6 +67,9 @@ namespace ThreeDISevenZeroR.UnityGifDecoder.Decode
             Clear();
         }
 
+        /// <summary>
+        /// Clear dictionary contents
+        /// </summary>
         public void Clear()
         {
             CodeSize = initialLzwCodeSize;
@@ -63,10 +79,24 @@ namespace ThreeDISevenZeroR.UnityGifDecoder.Decode
             isFull = false;
         }
 
+        /// <summary>
+        /// Is specified entry exists in dictionary
+        /// </summary>
         public bool Contains(int code) => code < dictionarySize;
+        
+        /// <summary>
+        /// Is this code is dictionary clear code?
+        /// </summary>
         public bool IsClearCode(int code) => code == clearCodeId;
+        
+        /// <summary>
+        /// Is this code is stop code?
+        /// </summary>
         public bool IsStopCode(int code) => code == stopCodeId;
 
+        /// <summary>
+        /// Output dictionary entry to canvas
+        /// </summary>
         public void OutputCode(int entry, GifCanvas c)
         {
             if (entry < initialDictionarySize)
@@ -82,6 +112,9 @@ namespace ThreeDISevenZeroR.UnityGifDecoder.Decode
             }
         }
 
+        /// <summary>
+        /// Create new dictionary entry from base entry
+        /// </summary>
         public int CreateNewCode(int baseEntry, int deriveEntry)
         {
             if (isFull)
@@ -92,18 +125,19 @@ namespace ThreeDISevenZeroR.UnityGifDecoder.Decode
 
             EnsureHeapCapacity(dictionaryHeapPosition + newEntry.size);
 
-            if (entry.size > 4)
-            {
-                Buffer.BlockCopy(dictionaryHeap, entry.heapPosition,
-                    dictionaryHeap, dictionaryHeapPosition, entry.size);
-                dictionaryHeapPosition += entry.size;
-            }
-            else
+            if (entry.size < 4)
             {
                 // It is faster to just copy array manually for small values
                 var endValue = entry.heapPosition + entry.size;
                 for (var i = entry.heapPosition; i < endValue; i++)
                     dictionaryHeap[dictionaryHeapPosition++] = dictionaryHeap[i];
+                
+            }
+            else
+            {
+                Buffer.BlockCopy(dictionaryHeap, entry.heapPosition,
+                    dictionaryHeap, dictionaryHeapPosition, entry.size);
+                dictionaryHeapPosition += entry.size;
             }
             
             dictionaryHeap[dictionaryHeapPosition++] = GetFirstCode(deriveEntry);
@@ -117,17 +151,16 @@ namespace ThreeDISevenZeroR.UnityGifDecoder.Decode
                 nextLzwCodeGrowth = CodeSize == 12 ? int.MaxValue : 1 << CodeSize;
             }
 
+            // Dictionary is capped at 4096 elements
             if (dictionarySize >= 4096)
-            {
                 isFull = true;
-            }
 
             return insertPosition;
         }
 
         private byte GetFirstCode(int entry)
         {
-            if (entry < initialDictionarySize - 2)
+            if (entry < initialDictionarySize)
                 return (byte) entry;
             
             return dictionaryHeap[dictionaryEntries[entry].heapPosition];
