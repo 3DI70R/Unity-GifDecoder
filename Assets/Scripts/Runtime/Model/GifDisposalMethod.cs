@@ -8,7 +8,7 @@
         Keep,
             
         /// <summary>
-        /// Clear canvas and draw
+        /// Clear previous region
         /// </summary>
         ClearToBackgroundColor,
             

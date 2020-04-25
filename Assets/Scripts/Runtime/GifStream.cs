@@ -74,7 +74,10 @@ namespace ThreeDISevenZeroR.UnityGifDecoder
         /// </summary>
         public bool HasMoreData => CurrentToken != Token.EndOfFile;
         
-        
+        /// <summary>
+        /// <p>Current stream token</p>
+        /// <p>You should call matching read method or skip it</p>
+        /// </summary>
         public Token CurrentToken { get; private set; }
         
         /// <summary>
@@ -151,6 +154,8 @@ namespace ThreeDISevenZeroR.UnityGifDecoder
         /// <br/>
         /// <p>GifStream is reusable, you can change stream and read new gif from it.
         /// That way you reuse allocations that you've made, and keep your memory usage to minimum</p>
+        /// <br/>
+        /// <p>Stream will be reset to its initial state</p>
         /// </summary>
         /// <param name="stream">new stream with gif data</param>
         /// <param name="disposePrevious">Dispose previous stream</param>
@@ -220,6 +225,11 @@ namespace ThreeDISevenZeroR.UnityGifDecoder
                 canvas.Reset();
         }
 
+        /// <summary>
+        /// Read gif header
+        /// </summary>
+        /// <returns>Data of gif header</returns>
+        /// <exception cref="ArgumentException">If file is not gif file</exception>
         public GifHeader ReadHeader()
         {
             AssertToken(Token.Header);
@@ -360,6 +370,10 @@ namespace ThreeDISevenZeroR.UnityGifDecoder
             return imageDescriptor;
         }
 
+        /// <summary>
+        /// Read and construct actual frame from previous encountered gif data
+        /// </summary>
+        /// <returns></returns>
         public GifImage ReadImage()
         {
             AssertToken(Token.Image);
@@ -384,7 +398,7 @@ namespace ThreeDISevenZeroR.UnityGifDecoder
             {
                 colors = canvas.Colors,
                 userInput = graphicControl.userInput,
-                delay = graphicControl.delayTime / 100f
+                delay = graphicControl.delayTime
             };
         }
 
@@ -513,8 +527,7 @@ namespace ThreeDISevenZeroR.UnityGifDecoder
         public void SkipApplicationExtension() => SkipBlock(Token.ApplicationExtension);
         
         private void DecodeLzwImageToCanvas(int lzwMinCodeSize, int x, int y, int width, int height,
-            Color32[] colorTable,
-            int transparentColorIndex, bool isInterlaced, GifDisposalMethod disposalMethod)
+            Color32[] colorTable, int transparentColorIndex, bool isInterlaced, GifDisposalMethod disposalMethod)
         {
             lzwDictionary.InitWithWordSize(lzwMinCodeSize);
             

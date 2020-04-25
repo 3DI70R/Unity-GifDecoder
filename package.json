@@ -1,6 +1,6 @@
 {
   "name": "ru.threedisevenzeror.unitygifdecoder",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "displayName": "Gif Decoder",
   "description": "Classes and components for reading and decoding .GIF files  in Unity",
   "unity": "2018.1",
