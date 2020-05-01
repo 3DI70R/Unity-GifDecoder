@@ -1,4 +1,4 @@
-﻿﻿using System;
+﻿﻿﻿using System;
  
 namespace ThreeDISevenZeroR.UnityGifDecoder.Decode
 {
@@ -7,12 +7,8 @@ namespace ThreeDISevenZeroR.UnityGifDecoder.Decode
     /// </summary>
     public class GifLzwDictionary
     {
-        /// <summary>
-        /// Current entry code size in bits
-        /// </summary>
-        public int CodeSize { get; private set; }
-        
-        private readonly Entry[] dictionaryEntries;
+        private readonly int[] dictionaryEntryOffsets;
+        private readonly int[] dictionaryEntrySizes;
         private byte[] dictionaryHeap;
         private int dictionarySize;
         private int dictionaryHeapPosition;
@@ -23,17 +19,21 @@ namespace ThreeDISevenZeroR.UnityGifDecoder.Decode
         private int nextLzwCodeGrowth;
         private int currentMinLzwCodeSize;
 
+        private int codeSize;
         private int clearCodeId;
         private int stopCodeId;
+        private int lastCodeId;
+
         private bool isFull;
-        
+
         /// <summary>
         /// Creates new instance and allocates dictionary resources
         /// </summary>
         public GifLzwDictionary()
         {
-            dictionaryEntries = new Entry[4096];
-            dictionaryHeap = new byte[16384];
+            dictionaryEntryOffsets = new int[4096];
+            dictionaryEntrySizes = new int[4096];
+            dictionaryHeap = new byte[32768];
         }
 
         /// <summary>
@@ -52,7 +52,8 @@ namespace ThreeDISevenZeroR.UnityGifDecoder.Decode
 
                 for (var i = 0; i < colorCount; i++)
                 {
-                    dictionaryEntries[i] = new Entry { heapPosition = dictionaryHeapPosition, size = 1 };
+                    dictionaryEntryOffsets[i] = dictionaryHeapPosition;
+                    dictionaryEntrySizes[i] = 1;
                     dictionaryHeap[dictionaryHeapPosition++] = (byte) i;
                 }
             
@@ -72,43 +73,61 @@ namespace ThreeDISevenZeroR.UnityGifDecoder.Decode
         /// </summary>
         public void Clear()
         {
-            CodeSize = initialLzwCodeSize;
+            codeSize = initialLzwCodeSize;
             dictionarySize = initialDictionarySize;
             dictionaryHeapPosition = initialDictionaryHeapPosition;
-            nextLzwCodeGrowth = 1 << CodeSize;
+            nextLzwCodeGrowth = 1 << codeSize;
             isFull = false;
+            lastCodeId = -1;
         }
 
         /// <summary>
-        /// Is specified entry exists in dictionary
+        /// Decode block reader to canvas
         /// </summary>
-        public bool Contains(int code) => code < dictionarySize;
-        
-        /// <summary>
-        /// Is this code is dictionary clear code?
-        /// </summary>
-        public bool IsClearCode(int code) => code == clearCodeId;
-        
-        /// <summary>
-        /// Is this code is stop code?
-        /// </summary>
-        public bool IsStopCode(int code) => code == stopCodeId;
-
-        /// <summary>
-        /// Output dictionary entry to canvas
-        /// </summary>
-        public void OutputCode(int entry, GifCanvas c)
+        public void DecodeStream(GifBitBlockReader reader, GifCanvas c)
         {
-            if (entry < initialDictionarySize)
+            while (true)
             {
-                c.OutputPixel(entry);
-            }
-            else
-            {
-                var e = dictionaryEntries[entry];
-                var heapEnd = e.heapPosition + e.size;
-                for (var i = e.heapPosition; i < heapEnd; i++)
-                    c.OutputPixel(dictionaryHeap[i]);
+                var entry = reader.ReadBits(codeSize);
+  
+                if (entry == clearCodeId)
+                {
+                    Clear();
+                    continue;
+                }
+
+                if (entry == stopCodeId)
+                {
+                    return;
+                }
+
+                // Decode
+                if (entry < dictionarySize)
+                {
+                    if (lastCodeId >= 0)
+                        CreateNewCode(lastCodeId, entry);
+                
+                    lastCodeId = entry;
+                }
+                else
+                {
+                    lastCodeId = CreateNewCode(lastCodeId, lastCodeId);
+                }
+                
+                // Output
+                if (lastCodeId < initialDictionarySize)
+                {
+                    c.OutputPixel(lastCodeId);
+                }
+                else
+                {
+                    var position = dictionaryEntryOffsets[lastCodeId];
+                    var size = dictionaryEntrySizes[lastCodeId];
+                    var heapEnd = position + size;
+                    
+                    for (var i = position; i < heapEnd; i++)
+                        c.OutputPixel(dictionaryHeap[i]);
+                }
             }
         }
 
@@ -120,35 +139,40 @@ namespace ThreeDISevenZeroR.UnityGifDecoder.Decode
             if (isFull)
                 return -1;
 
-            var entry = dictionaryEntries[baseEntry];
-            var newEntry = new Entry {heapPosition = dictionaryHeapPosition, size = entry.size + 1};
-
-            EnsureHeapCapacity(dictionaryHeapPosition + newEntry.size);
-
-            if (entry.size < 4)
+            var entryHeapPosition = dictionaryEntryOffsets[baseEntry];
+            var entrySize = dictionaryEntrySizes[baseEntry];
+            var newEntryOffset = dictionaryHeapPosition;
+            var newEntrySize = entrySize + 1;
+            var newHeapCapacity = newEntryOffset + newEntrySize;
+            
+            if (dictionaryHeap.Length < newHeapCapacity)
+                Array.Resize(ref dictionaryHeap, Math.Max(dictionaryHeap.Length * 2, newHeapCapacity));
+ 
+            if (entrySize < 12)
             {
                 // It is faster to just copy array manually for small values
-                var endValue = entry.heapPosition + entry.size;
-                for (var i = entry.heapPosition; i < endValue; i++)
+                var endValue = entryHeapPosition + entrySize;
+                for (var i = entryHeapPosition; i < endValue; i++)
                     dictionaryHeap[dictionaryHeapPosition++] = dictionaryHeap[i];
-                
             }
             else
             {
-                Buffer.BlockCopy(dictionaryHeap, entry.heapPosition,
-                    dictionaryHeap, dictionaryHeapPosition, entry.size);
-                dictionaryHeapPosition += entry.size;
+                Buffer.BlockCopy(dictionaryHeap, entryHeapPosition,
+                    dictionaryHeap, dictionaryHeapPosition, entrySize);
+                dictionaryHeapPosition += entrySize;
             }
-            
-            dictionaryHeap[dictionaryHeapPosition++] = GetFirstCode(deriveEntry);
+
+            dictionaryHeap[dictionaryHeapPosition++] = deriveEntry < initialDictionarySize
+                ? (byte) deriveEntry : dictionaryHeap[dictionaryEntryOffsets[deriveEntry]];
 
             var insertPosition = dictionarySize++;
-            dictionaryEntries[insertPosition] = newEntry;
+            dictionaryEntryOffsets[insertPosition] = newEntryOffset;
+            dictionaryEntrySizes[insertPosition] = newEntrySize;
 
             if (dictionarySize >= nextLzwCodeGrowth)
             {
-                CodeSize++;
-                nextLzwCodeGrowth = CodeSize == 12 ? int.MaxValue : 1 << CodeSize;
+                codeSize++;
+                nextLzwCodeGrowth = codeSize == 12 ? int.MaxValue : 1 << codeSize;
             }
 
             // Dictionary is capped at 4096 elements
@@ -156,26 +180,6 @@ namespace ThreeDISevenZeroR.UnityGifDecoder.Decode
                 isFull = true;
 
             return insertPosition;
-        }
-
-        private byte GetFirstCode(int entry)
-        {
-            if (entry < initialDictionarySize)
-                return (byte) entry;
-            
-            return dictionaryHeap[dictionaryEntries[entry].heapPosition];
-        }
-
-        private void EnsureHeapCapacity(int size)
-        {
-            if (dictionaryHeap.Length < size)
-                Array.Resize(ref dictionaryHeap, Math.Max(dictionaryHeap.Length * 2, size));
-        }
-
-        private struct Entry
-        {
-            public int heapPosition;
-            public int size;
         }
     }
 }

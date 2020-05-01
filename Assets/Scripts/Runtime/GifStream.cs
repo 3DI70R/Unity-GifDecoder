@@ -529,48 +529,15 @@ namespace ThreeDISevenZeroR.UnityGifDecoder
         private void DecodeLzwImageToCanvas(int lzwMinCodeSize, int x, int y, int width, int height,
             Color32[] colorTable, int transparentColorIndex, bool isInterlaced, GifDisposalMethod disposalMethod)
         {
-            lzwDictionary.InitWithWordSize(lzwMinCodeSize);
-            
             if (header.hasGlobalColorTable)
                 canvas.BackgroundColor = globalColorTable[header.transparentColorIndex];
             
             canvas.BeginNewFrame(x, y, width, height, colorTable, transparentColorIndex, isInterlaced, disposalMethod);
-
-            var lastCodeId = -1;
-            blockReader.StartNewReading();
-
-            while (true)
-            {
-                var codeId = blockReader.ReadBits(lzwDictionary.CodeSize);
-
-                if (lzwDictionary.IsClearCode(codeId))
-                {
-                    lzwDictionary.Clear();
-                    lastCodeId = -1;
-                }
-                else if (lzwDictionary.IsStopCode(codeId))
-                {
-                    break;
-                }
-                else
-                {
-                    if (lzwDictionary.Contains(codeId))
-                    {
-                        lzwDictionary.OutputCode(codeId, canvas);
-
-                        if (lastCodeId >= 0)
-                            lzwDictionary.CreateNewCode(lastCodeId, codeId);
-
-                        lastCodeId = codeId;
-                    }
-                    else
-                    {
-                        lastCodeId = lzwDictionary.CreateNewCode(lastCodeId, lastCodeId);
-                        lzwDictionary.OutputCode(lastCodeId, canvas);
-                    }
-                }
-            }
             
+            lzwDictionary.InitWithWordSize(lzwMinCodeSize);
+            blockReader.StartNewReading();
+            
+            lzwDictionary.DecodeStream(blockReader, canvas);
             blockReader.FinishReading();
         }
         

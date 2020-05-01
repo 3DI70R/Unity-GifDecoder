@@ -70,10 +70,10 @@ Since gif is archaic format which requires sequential reading of all data (No mu
 - Lzw dictionary uses own byte array heap, so insertions and deletions not use allocations
 - Pixels decoded from lzw dictionary are placed straight to final location, even when deinterlacing is used, no deinterlace postprocess step
 
-For benchmark: SourPls 3x, 112x112, one global palette, 491 frames  
+For benchmark: SourPls 3x, 140x140, one global palette, 491 frames  
 ![GifDecoder](https://cdn.betterttv.net/emote/566ca38765dbbdab32ec0560/3x)
 
-This library, ~1.78 ms per frame, 385.5kb of memory allocated
+This library, ~0.96 ms per frame, 385.1kb of memory allocated
 ![GifDecoder](.Images/GifDecoderBench.png)
 
 UniGif for comparsion, ~19.27ms per frame, 0.81**gb** of memory allocated
@@ -96,6 +96,8 @@ Changelog
   - Initial version
 - 1.0.1
   - Delay changed to int and few utility methods added to read it as seconds or milliseconds
+- 1.0.2
+  - Image decoding refactoring, resulting nearly 2x performance boost
 
 TODO:
 -

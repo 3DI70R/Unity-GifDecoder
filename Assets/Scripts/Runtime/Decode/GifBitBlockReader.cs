@@ -63,10 +63,15 @@ namespace ThreeDISevenZeroR.UnityGifDecoder
         public int ReadBits(int count)
         {
             var result = 0;
-            
-            for(var i = 0; i < count; i++)
+            var bitsToRead = count;
+            var offset = 0;
+
+            while(true)
             {
-                if (currentBitPosition == 8)
+                if(bitsToRead <= 0)
+                    break;
+                
+                if (currentBitPosition >= 8)
                 {
                     currentBitPosition = 0;
                     
@@ -84,8 +89,15 @@ namespace ThreeDISevenZeroR.UnityGifDecoder
                     }
                 }
 
-                result += ((currentByte & (1 << currentBitPosition)) != 0 ? 1 : 0) << i;
-                currentBitPosition++;
+                var bitsAvailable = 8 - currentBitPosition;
+                var mask = (byte) (((1 << bitsToRead) - 1) << currentBitPosition);
+                var readCount = bitsAvailable < bitsToRead ? bitsAvailable : bitsToRead;
+
+                result += ((mask & currentByte) >> currentBitPosition) << offset;
+
+                currentBitPosition += readCount;
+                bitsToRead -= readCount;
+                offset += readCount;
             }
 
             return result;
