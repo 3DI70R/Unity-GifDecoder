@@ -71,7 +71,8 @@ Since gif is archaic format which requires sequential reading of all data (No mu
 - Pixels decoded from lzw dictionary are placed straight to final location, even when deinterlacing is used, no deinterlace postprocess step
 
 For benchmark: SourPls 3x, 140x140, one global palette, 491 frames  
-![GifDecoder](https://cdn.betterttv.net/emote/566ca38765dbbdab32ec0560/3x)
+![GifDecoder](https://cdn.betterttv.net/emote/566ca38765dbbdab32ec0560/3x)  
+Tested on Windows Desktop with Ryzen 3900x CPU
 
 This library, ~0.96 ms per frame, 385.1kb of memory allocated
 ![GifDecoder](.Images/GifDecoderBench.png)
