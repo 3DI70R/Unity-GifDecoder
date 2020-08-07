@@ -83,7 +83,7 @@ UniGif for comparsion, ~19.27ms per frame, 0.81**gb** of memory allocated
 
 Encoding
 -
-This library doesn't support gif encoding, as it is more sophisticated process than encoding and currently 
+This library doesn't support gif encoding, as it is more sophisticated process than decoding and currently 
 i have no programs that require encoding. So no encoding and no plans for implementation.
 
 Portability
@@ -99,6 +99,8 @@ Changelog
   - Delay changed to int and few utility methods added to read it as seconds or milliseconds
 - 1.0.2
   - Image decoding refactoring, resulting nearly 2x performance boost
+- 1.0.3
+  - Minor improvements and typo fixes
 
 TODO:
 -

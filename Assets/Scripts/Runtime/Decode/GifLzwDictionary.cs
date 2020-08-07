@@ -115,19 +115,12 @@ namespace ThreeDISevenZeroR.UnityGifDecoder.Decode
                 }
                 
                 // Output
-                if (lastCodeId < initialDictionarySize)
-                {
-                    c.OutputPixel(lastCodeId);
-                }
-                else
-                {
-                    var position = dictionaryEntryOffsets[lastCodeId];
-                    var size = dictionaryEntrySizes[lastCodeId];
-                    var heapEnd = position + size;
+                var position = dictionaryEntryOffsets[lastCodeId];
+                var size = dictionaryEntrySizes[lastCodeId];
+                var heapEnd = position + size;
                     
-                    for (var i = position; i < heapEnd; i++)
-                        c.OutputPixel(dictionaryHeap[i]);
-                }
+                for (var i = position; i < heapEnd; i++)
+                    c.OutputPixel(dictionaryHeap[i]);
             }
         }
 

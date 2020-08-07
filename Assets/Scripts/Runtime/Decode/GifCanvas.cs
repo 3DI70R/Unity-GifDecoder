@@ -173,11 +173,11 @@ namespace ThreeDISevenZeroR.UnityGifDecoder
                 frameCanvasPosition = frameRowStart[frameRowCurrent];
                 frameCanvasRowEndPosition = frameRowEnd[frameRowCurrent];
             }
-
+            
             if (color != frameTransparentColorIndex)
-                canvasColors[frameCanvasPosition++] = framePalette[color];
-            else
-                frameCanvasPosition++;
+                canvasColors[frameCanvasPosition] = framePalette[color];
+
+            frameCanvasPosition++;
         }
         
         /// <summary>
@@ -185,7 +185,7 @@ namespace ThreeDISevenZeroR.UnityGifDecoder
         /// </summary>
         public void FillWithColor(int x, int y, int width, int height, Color32 color)
         {
-            if (x == 0 && y == 0 && width == canvasWidth && height == canvasHeight)
+            if (width == canvasWidth && height == canvasHeight)
             {
                 for (var i = canvasColors.Length - 1; i >= 0; i--)
                     canvasColors[i] = color;
@@ -218,7 +218,7 @@ namespace ThreeDISevenZeroR.UnityGifDecoder
         /// <summary>
         /// <p>Plan most optimal image drawing route</p>
         /// <p>So colors can be written to final locations right from the start,
-        /// without intermediate buffers or sorting/p>
+        /// without intermediate buffers or sorting</p>
         /// </summary>
         private void RouteFrameDrawing(int x, int y, int width, int height, bool deinterlace)
         {
@@ -238,7 +238,7 @@ namespace ThreeDISevenZeroR.UnityGifDecoder
             if (deinterlace)
             {
                 for (var i = 0; i < height; i += 8) ScheduleRowIndex(i); // every 8, start with 0
-                for (var i = 4; i < height; i += 8) ScheduleRowIndex(i); // every 0, start with 4
+                for (var i = 4; i < height; i += 8) ScheduleRowIndex(i); // every 8, start with 4
                 for (var i = 2; i < height; i += 4) ScheduleRowIndex(i); // every 4, start with 2
                 for (var i = 1; i < height; i += 2) ScheduleRowIndex(i); // every 2, start with 1
             }
